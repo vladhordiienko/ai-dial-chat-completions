@@ -1,13 +1,15 @@
 import asyncio
 
 from task.clients.client import DialClient
+from task.clients.custom_client import CustomDialClient
 from task.constants import DEFAULT_SYSTEM_PROMPT
 from task.models.conversation import Conversation
 from task.models.message import Message
 from task.models.role import Role
 
+DEPLOYMENT_NAME = "gpt-4o"
 
-async def start(stream: bool) -> None:
+async def start(custom: bool, stream: bool) -> None:
     #TODO:
     # 1.1. Create DialClient
     # (you can get available deployment_name via https://ai-proxy.lab.epam.com/openai/models
@@ -25,9 +27,44 @@ async def start(stream: bool) -> None:
     # 8. Add generated message to history
     # 9. Test it with DialClient and CustomDialClient
     # 10. In CustomDialClient add print of whole request and response to see what you send and what you get in response
-    raise NotImplementedError
+
+    if custom:
+        client = CustomDialClient(DEPLOYMENT_NAME)
+    else:
+        client = DialClient(DEPLOYMENT_NAME)
+
+    conversation = Conversation()
+
+    sys_prompt = input("System prompt (empty for default): ").strip()
+
+    if sys_prompt:
+        conversation.add_message(Message(Role.SYSTEM, sys_prompt))
+        print(sys_prompt)
+    else:
+        conversation.add_message(Message(Role.SYSTEM, DEFAULT_SYSTEM_PROMPT))
+        print(DEFAULT_SYSTEM_PROMPT)
+    print()
+
+    print("Use on of these command 'exit' to quit or 'history' to show your history.")
+    while True:
+        user_input = input("You: ").strip()
+
+        if user_input.lower() == "exit":
+            break
+        elif user_input.lower() == "history":
+            print(conversation.get_messages())
+            continue
+
+        conversation.add_message(Message(Role.USER, user_input))
+
+        print("AI:")
+        if stream:
+            ai_message = await client.stream_completion(conversation.get_messages())
+        else:
+            ai_message = client.get_completion(conversation.get_messages())
+
+        conversation.add_message(ai_message)
 
 
-asyncio.run(
-    start(True)
-)
+if __name__ == "__main__":
+    asyncio.run(start(custom=False, stream=True))
